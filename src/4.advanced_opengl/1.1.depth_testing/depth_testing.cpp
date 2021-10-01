@@ -12,6 +12,8 @@
 #include <learnopengl/model.h>
 
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -20,8 +22,8 @@ void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char *path);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 960;
+const unsigned int SCR_HEIGHT = 720;
 
 // camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
@@ -41,6 +43,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    //glfwWindowsHint(GLFW_SAMPLES, 4);
 
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -74,7 +77,8 @@ int main()
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_ALWAYS); // always pass the depth test (same effect as glDisable(GL_DEPTH_TEST))
+    glEnable(GL_MULTISAMPLE); // enabled by default on some drivers, but not all so always enable to make sure
+    glDepthFunc(GL_LESS);     // always pass the depth test (same effect as glDisable(GL_DEPTH_TEST))
 
     // build and compile shaders
     // -------------------------
@@ -128,13 +132,13 @@ int main()
     };
     float planeVertices[] = {
         // positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
-         5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
-        -5.0f, -0.5f,  5.0f,  0.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
+         50.0f, -0.5f,  50.0f,  2.0f, 0.0f,
+        -50.0f, -0.5f,  50.0f,  0.0f, 0.0f,
+        -50.0f, -0.5f, -50.0f,  0.0f, 2.0f,
 
-         5.0f, -0.5f,  5.0f,  2.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f,  0.0f, 2.0f,
-         5.0f, -0.5f, -5.0f,  2.0f, 2.0f								
+         50.0f, -0.5f,  50.0f,  2.0f, 0.0f,
+        -50.0f, -0.5f, -50.0f,  0.0f, 2.0f,
+         50.0f, -0.5f, -50.0f,  2.0f, 2.0f								
     };
     // cube VAO
     unsigned int cubeVAO, cubeVBO;
@@ -170,6 +174,10 @@ int main()
     // --------------------
     shader.use();
     shader.setInt("texture1", 0);
+    
+    double lastTime = glfwGetTime();
+    int nbFrames = 0;
+
 
     // render loop
     // -----------
@@ -218,6 +226,21 @@ int main()
         // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        // FPS
+        double currentTime = glfwGetTime();
+        nbFrames++;
+        if ( currentTime - lastTime >= 1.0 ){
+            double fps = double(nbFrames) / (currentTime - lastTime);
+            std::stringstream stream;
+            stream << "FPS: " << std::fixed << std::setprecision(2) << fps;
+            std::string s = stream.str();
+            char char_str[32];
+            strcpy(char_str, s.c_str());
+            glfwSetWindowTitle(window, char_str);
+            nbFrames = 0;
+            lastTime += 1.0;
+        }
     }
 
     // optional: de-allocate all resources once they've outlived their purpose:
