@@ -22,7 +22,7 @@
 #include <iomanip>
 #include <sstream>
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
@@ -30,14 +30,15 @@ unsigned int loadTexture(const char *path);
 void RenderText(Shader &shader, std::string text, float x, float y, float scale, glm::vec3 color);
 
 // settings
-const unsigned int SCR_WIDTH = 960;
+const unsigned int SCR_WIDTH = 1152;
 const unsigned int SCR_HEIGHT = 720;
 
 /// Holds all state information relevant to a character as loaded using FreeType
-struct Character {
+struct Character
+{
     unsigned int TextureID; // ID handle of the glyph texture
-    glm::ivec2   Size;      // Size of glyph
-    glm::ivec2   Bearing;   // Offset from baseline to left/top of glyph
+    glm::ivec2 Size;        // Size of glyph
+    glm::ivec2 Bearing;     // Offset from baseline to left/top of glyph
     unsigned int Advance;   // Horizontal offset to advance to next glyph
 };
 
@@ -45,7 +46,7 @@ std::map<GLchar, Character> Characters;
 unsigned int VAO, VBO;
 
 // camera
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+Camera camera(glm::vec3(0.0f, 1.2f, 0.0f));
 float lastX = (float)SCR_WIDTH / 2.0;
 float lastY = (float)SCR_HEIGHT / 2.0;
 bool firstMouse = true;
@@ -95,13 +96,53 @@ int main()
 
     // configure global opengl state
     // -----------------------------
-    glEnable(GL_DEPTH_TEST);
+    //glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_MULTISAMPLE); // enabled by default on some drivers, but not all so always enable to make sure
     glDepthFunc(GL_LESS);     // always pass the depth test (same effect as glDisable(GL_DEPTH_TEST))
 
-    // compile and setup the shader
+    // build and compile our shader zprogram
+    // ------------------------------------
+    Shader bgShader("4.1.texture.vs", "4.1.texture.fs");
+
+    // set up vertex data (and buffer(s)) and configure vertex attributes
+    // ------------------------------------------------------------------
+    float bgVertices[] = {
+        // positions          // colors           // texture coords
+        0.8f, 0.8f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,   // top right
+        0.8f, -0.8f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,  // bottom right
+        -0.8f, -0.8f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, // bottom left
+        -0.8f, 0.8f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f   // top left
+    };
+    unsigned int bgIndices[] = {
+        0, 1, 3, // first triangle
+        1, 2, 3  // second triangle
+    };
+    unsigned int bgVBO, bgVAO, bgEBO;
+    glGenVertexArrays(1, &bgVAO);
+    glGenBuffers(1, &bgVBO);
+    glGenBuffers(1, &bgEBO);
+
+    glBindVertexArray(bgVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, bgVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(bgVertices), bgVertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bgEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(bgIndices), bgIndices, GL_STATIC_DRAW);
+
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+    // color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    // texture coord attribute
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    // compile and setup the shader for 2D background
     // ----------------------------
     Shader textShader("text.vs", "text.fs");
     glm::mat4 textProjection = glm::ortho(0.0f, static_cast<float>(SCR_WIDTH), 0.0f, static_cast<float>(SCR_HEIGHT));
@@ -118,21 +159,23 @@ int main()
         return -1;
     }
 
-	// find path to font
+    // find path to font
     std::string font_name = FileSystem::getPath("resources/fonts/Antonio-Bold.ttf");
     if (font_name.empty())
     {
         std::cout << "ERROR::FREETYPE: Failed to load font_name" << std::endl;
         return -1;
     }
-	
-	// load font as face
+
+    // load font as face
     FT_Face face;
-    if (FT_New_Face(ft, font_name.c_str(), 0, &face)) {
+    if (FT_New_Face(ft, font_name.c_str(), 0, &face))
+    {
         std::cout << "ERROR::FREETYPE: Failed to load font" << std::endl;
         return -1;
     }
-    else {
+    else
+    {
         // set size to load glyphs as
         FT_Set_Pixel_Sizes(face, 0, 48);
 
@@ -142,7 +185,7 @@ int main()
         // load first 128 characters of ASCII set
         for (unsigned char c = 0; c < 128; c++)
         {
-            // Load character glyph 
+            // Load character glyph
             if (FT_Load_Char(face, c, FT_LOAD_RENDER))
             {
                 std::cout << "ERROR::FREETYTPE: Failed to load Glyph" << std::endl;
@@ -161,8 +204,7 @@ int main()
                 0,
                 GL_RED,
                 GL_UNSIGNED_BYTE,
-                face->glyph->bitmap.buffer
-            );
+                face->glyph->bitmap.buffer);
             // set texture options
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -173,8 +215,7 @@ int main()
                 texture,
                 glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
                 glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-                static_cast<unsigned int>(face->glyph->advance.x)
-            };
+                static_cast<unsigned int>(face->glyph->advance.x)};
             Characters.insert(std::pair<char, Character>(c, character));
         }
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -182,7 +223,6 @@ int main()
     // destroy FreeType once we're finished
     FT_Done_Face(face);
     FT_Done_FreeType(ft);
-
 
     // configure VAO/VBO for texture quads
     // -----------------------------------
@@ -195,7 +235,33 @@ int main()
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-    
+
+    // load and create a texture for background
+    // -------------------------
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture); // all upcoming GL_TEXTURE_2D operations now have effect on this texture object
+    // set the texture wrapping parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); // set texture wrapping to GL_REPEAT (default wrapping method)
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // set texture filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load image, create texture and generate mipmaps
+    int width, height, nrChannels;
+    // The FileSystem::getPath(...) is part of the GitHub repository so we can find files on any IDE/platform; replace it with your own image path.
+    unsigned char *data = stbi_load(FileSystem::getPath("resources/textures/Endeavor_2F_101.jpg").c_str(), &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
+
     // build and compile shaders
     // -------------------------
     Shader shader("1.1.depth_testing.vs", "1.1.depth_testing.fs");
@@ -247,13 +313,13 @@ int main()
         -0.5f, 0.5f, -0.5f, 0.0f, 1.0f};
     float planeVertices[] = {
         // positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
-        50.0f, -0.5f, 50.0f, 2.0f, 0.0f,
-        -50.0f, -0.5f, 50.0f, 0.0f, 0.0f,
-        -50.0f, -0.5f, -50.0f, 0.0f, 2.0f,
+        50.0f, 0.0f, 50.0f, 2.0f, 0.0f,
+        -50.0f, 0.0f, 50.0f, 0.0f, 0.0f,
+        -50.0f, 0.0f, -50.0f, 0.0f, 2.0f,
 
-        50.0f, -0.5f, 50.0f, 2.0f, 0.0f,
-        -50.0f, -0.5f, -50.0f, 0.0f, 2.0f,
-        50.0f, -0.5f, -50.0f, 2.0f, 2.0f};
+        50.0f, 0.0f, 50.0f, 2.0f, 0.0f,
+        -50.0f, 0.0f, -50.0f, 0.0f, 2.0f,
+        50.0f, 0.0f, -50.0f, 2.0f, 2.0f};
     // cube VAO
     unsigned int cubeVAO, cubeVBO;
     glGenVertexArrays(1, &cubeVAO);
@@ -311,6 +377,18 @@ int main()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // bind Texture
+        glBindTexture(GL_TEXTURE_2D, texture);
+
+        glDisable(GL_DEPTH_TEST);
+
+        // render 2D background
+        bgShader.use();
+        glBindVertexArray(bgVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        glEnable(GL_DEPTH_TEST);
+
         shader.use();
         glm::mat4 model = glm::mat4(1.0f);
         glm::mat4 view = camera.GetViewMatrix();
@@ -336,7 +414,7 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
 
-        RenderText(textShader, "This is sample text", 25.0f, 25.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
+        RenderText(textShader, "This is sample text", 50.0f, 50.0f, 1.0f, glm::vec3(0.5, 0.8f, 0.2f));
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -467,7 +545,7 @@ unsigned int loadTexture(char const *path)
 // -------------------
 void RenderText(Shader &shader, std::string text, float x, float y, float scale, glm::vec3 color)
 {
-    // activate corresponding render state	
+    // activate corresponding render state
     shader.use();
     glUniform3f(glGetUniformLocation(shader.ID, "textColor"), color.x, color.y, color.z);
     glActiveTexture(GL_TEXTURE0);
@@ -475,7 +553,7 @@ void RenderText(Shader &shader, std::string text, float x, float y, float scale,
 
     // iterate through all characters
     std::string::const_iterator c;
-    for (c = text.begin(); c != text.end(); c++) 
+    for (c = text.begin(); c != text.end(); c++)
     {
         Character ch = Characters[*c];
 
@@ -486,14 +564,13 @@ void RenderText(Shader &shader, std::string text, float x, float y, float scale,
         float h = ch.Size.y * scale;
         // update VBO for each character
         float vertices[6][4] = {
-            { xpos,     ypos + h,   0.0f, 0.0f },            
-            { xpos,     ypos,       0.0f, 1.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
+            {xpos, ypos + h, 0.0f, 0.0f},
+            {xpos, ypos, 0.0f, 1.0f},
+            {xpos + w, ypos, 1.0f, 1.0f},
 
-            { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
-            { xpos + w, ypos + h,   1.0f, 0.0f }           
-        };
+            {xpos, ypos + h, 0.0f, 0.0f},
+            {xpos + w, ypos, 1.0f, 1.0f},
+            {xpos + w, ypos + h, 1.0f, 0.0f}};
         // render glyph texture over quad
         glBindTexture(GL_TEXTURE_2D, ch.TextureID);
         // update content of VBO memory

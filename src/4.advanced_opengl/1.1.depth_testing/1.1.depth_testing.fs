@@ -12,7 +12,8 @@ void main()
     float divisions = 100.0;
     float thickness = 0.02;
     float delta = 0.05 / 2.0;
-    float cutoff = 3.0;
+    float cutoff = 5.0;
+    float base_alpha = 1.0;
 
     float x = fract(TexCoords.x * divisions);
     x = min(x, 1.0 - x);
@@ -31,7 +32,7 @@ void main()
     float dist = distance(FragPos, viewPos);
     vec3 color = vec3(0.0, c*0.5, c);
     if( dist < cutoff ) 
-        FragColor = vec4(color, 1.0);
+        FragColor = vec4(color, base_alpha);
     else   
-        FragColor = vec4(color / (dist + 1 - cutoff), 1.0 / (dist + 1 - cutoff));
+        FragColor = vec4(color / (dist + 1 - cutoff), base_alpha / (dist + 1 - cutoff));
 }
